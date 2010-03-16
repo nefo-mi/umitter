@@ -4,6 +4,7 @@ require 'net/http'
 require 'yaml'
 require 'rexml/document'
 require 'uri'
+require 'kconv'
 
 class Umitter
   def initialize
@@ -19,14 +20,16 @@ class Umitter
     tweets.each do |tweet|
       twitter_write(tweet)
       sleep 10
+#    puts tweet
     end
   end
 
   def twitter_write(msg)
+    msg_utf8 = Kconv.toutf8(msg)
     Net::HTTP.version_1_2
     req = Net::HTTP::Post.new('/statuses/update.json')
     req.basic_auth(@user, @password)
-    req.body = 'status=' + URI.encode(msg.toutf8)
+    req.body = 'status=' + URI.encode(msg_utf8)
 
     res = ""
     Net::HTTP.start('twitter.com', 80) do |http|
