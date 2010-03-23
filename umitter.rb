@@ -8,7 +8,7 @@ require 'kconv'
 
 class Umitter
   def initialize
-    locate = Dir::pwd
+    locate = File.dirname(__FILE__)
     config = YAML.load_file("#{locate}/config.yml")
     @user = config[:user]
     @password = config[:password]
