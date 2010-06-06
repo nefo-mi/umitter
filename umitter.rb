@@ -5,36 +5,40 @@ require 'yaml'
 require 'rexml/document'
 require 'uri'
 require 'kconv'
+require 'simple-oauth'
 
 class Umitter
   def initialize
     locate = File.dirname(__FILE__)
-    config = YAML.load_file("#{locate}/config.yml")
-    @user = config[:user]
-    @password = config[:password]
-    @message = YAML.load_file("#{locate}/message.yml")
+    config = YAML.load_file("#{locate}/oauth_umitter.yaml")
+    @twitter_client = SimpleOAuth.new(
+      config[:Consumer_key],
+      config[:Consumer_secret],
+      config[:Access_token],
+      config[:Access_token_secret]
+    )
+
+    yaml = YAML.load_file("#{locate}/message.yml")
+    @message = yaml[:message]
+    @e2j = yaml[:e2j]
   end
   
-  def hoge
+  def run
     tweets = analyse_weather
     tweets.each do |tweet|
       twitter_write(tweet)
       sleep 10
-#    puts tweet
     end
   end
 
+  private
+
   def twitter_write(msg)
     msg_utf8 = Kconv.toutf8(msg)
-    Net::HTTP.version_1_2
-    req = Net::HTTP::Post.new('/statuses/update.json')
-    req.basic_auth(@user, @password)
-    req.body = 'status=' + URI.encode(msg_utf8)
-
-    res = ""
-    Net::HTTP.start('twitter.com', 80) do |http|
-      res = http.request(req)
-    end
+    res = @twitter_client.post('http://twitter.com/statuses/update.json', {
+        :status => msg_utf8
+    })
+    raise "Request failed: #{res.code}" unless res.code.to_i == 200
   end
 
   def convert_rss2string(infos)
@@ -46,7 +50,7 @@ class Umitter
       if ("Temperature".eql?(info_utf8.first))
         converted_info.push(info_utf8.last.split(" / ").last.scan(/\d+/).first + "℃")
       elsif ("Wind Direction".eql?(info_utf8.first))
-        converted_info.push(info_utf8.last)
+        converted_info.push(@e2j[info_utf8.last])
       elsif ("Wind Speed".eql?(info_utf8.first))
         km = info_utf8.last.scan(/\d+km\/h/).pop.to_i
         m = km * 1000 / 3600
@@ -158,7 +162,7 @@ class Umitter
     point = get_message(kazamuki)
     link = "( " + link +  ")"
 
-    line = ["気温:"+ kion, "天気:" + tenki, "風速:" + huusoku, "風向き:" + kazamuki, kousin + "現在" , link].join(" ")
+    line = ["気温:"+ kion, "天気:" + tenki, "風速:" + huusoku, "風向き:" + kazamuki].join(" ")
 
     result.push(line)
 
